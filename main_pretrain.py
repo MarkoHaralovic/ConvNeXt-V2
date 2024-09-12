@@ -30,6 +30,15 @@ import utils
 from utils import NativeScalerWithGradNormCount as NativeScaler
 from utils import str2bool
 
+from ffcv.writer import DatasetWriter
+from ffcv.fields import RGBImageField, IntField
+from ffcv.loader import Loader, OrderOption
+from ffcv.transforms import ToTensor, ToDevice, ToTorchImage
+from ffcv.fields.decoders import IntDecoder, RandomResizedCropRGBImageDecoder
+from ffcv.transforms.flip import RandomHorizontalFlip
+from ffcv.transforms.normalize import NormalizeImage
+from ffcv.transforms.random_resized_crop import RandomResizedCrop
+
 def get_args_parser():
     parser = argparse.ArgumentParser('FCMAE pre-training', add_help=False)
     parser.add_argument('--batch_size', default=64, type=int,
@@ -86,7 +95,11 @@ def get_args_parser():
     parser.add_argument('--num_workers', default=10, type=int)
     parser.add_argument('--pin_mem', type=str2bool, default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
-    
+    parser.add_argument('--convert_to_ffcv',type=str2bool, default=False,
+                        help='bool flag whether to use ffcv dataloader and convert current dataloader to ffcv')
+    parser.add_argument('--beton_path',type=str,default='/log_dir/imagenet.beton',
+                        help='Specify the path where to save the beton data')
+
     # Evaluation parameters
     parser.add_argument('--crop_pct', type=float, default=None)
 
@@ -97,6 +110,8 @@ def get_args_parser():
     parser.add_argument('--dist_on_itp', type=str2bool, default=False)
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
+    parser.add_argument('--find_unused_parameters', type=str2bool,default=False)
+
     return parser
 
 def main(args):
@@ -104,7 +119,7 @@ def main(args):
 
     print(args)
     device = torch.device(args.device)
-
+    print(device)
     # fix the seed for reproducibility
     seed = args.seed + utils.get_rank()
     torch.manual_seed(seed)
@@ -114,18 +129,24 @@ def main(args):
     
     # simple augmentation
     transform_train = transforms.Compose([
-            transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=3),  # 3 is bicubic
+            transforms.RandomResizedCrop(args.input_size, scale=(0.2, 1.0), interpolation=transforms.InterpolationMode.BICUBIC), 
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
+    if args.convert_to_ffcv == False:
+        print("Creating standard dataset.")
+        dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'), transform=transform_train)
+    else:
+        print("Creating adjusted dataset.")
+        dataset_train = datasets.ImageFolder(os.path.join(args.data_path, 'train'))
+
     print(dataset_train)
 
     num_tasks = utils.get_world_size()
     global_rank = utils.get_rank()
 
     sampler_train = torch.utils.data.DistributedSampler(
-        dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True, seed=args.seed,
+            dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True, seed=args.seed,
     )
     print("Sampler_train = %s" % str(sampler_train))
 
@@ -136,13 +157,54 @@ def main(args):
     else:
         log_writer = None
 
-    data_loader_train = torch.utils.data.DataLoader(
-        dataset_train, sampler=sampler_train,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        pin_memory=args.pin_mem,
-        drop_last=True,
-    )
+    if args.convert_to_ffcv == False:
+        print("Creating standard dataloader.")
+        data_loader_train = torch.utils.data.DataLoader(
+            dataset_train, sampler=sampler_train,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            pin_memory=args.pin_mem,
+            drop_last=True,
+        )
+    else:
+        print("Creating ffcv dataset")
+        writer = DatasetWriter(
+            Path(args.beton_path),
+            {
+                'image' : RGBImageField(write_mode='jpg', max_resolution=args.input_size),
+                'label' : IntField()
+            }
+        )
+        if not os.path.exists(Path(args.beton_path)):
+            print("Creating beton file")
+            writer.from_indexed_dataset(dataset_train)
+        else:
+            print(f"Beton file with the same name exists on path : {args.beton_path}, skipping conversion.")
+        image_decoder = RandomResizedCropRGBImageDecoder(output_size=(args.input_size, args.input_size), scale=(0.2, 1.0))
+        label_decoder = IntDecoder()
+
+        # Data decoding and augmentation
+        image_pipeline = [image_decoder, RandomHorizontalFlip(), NormalizeImage(mean=np.array([0.485, 0.456, 0.406]), std=np.array([0.229, 0.224, 0.225]),type=np.uint8),ToTensor(), ToTorchImage(), ToDevice(device)]
+        label_pipeline = [label_decoder, ToTensor(), ToDevice(device)]
+
+        # Pipeline for each data field
+        pipelines = {
+            'image': image_pipeline,
+            'label': label_pipeline
+        }
+
+        print("Creating ffcv dataloader")
+        # Replaces PyTorch data loader (`torch.utils.data.Dataloader`)
+        data_loader_train = Loader(fname=Path(args.beton_path), 
+                                   batch_size=args.batch_size, 
+                                   num_workers=args.num_workers,
+                                   order=OrderOption.RANDOM, 
+                                   pipelines=pipelines,
+                                   seed=seed, 
+                                   drop_last=True,
+                                   distributed=args.distributed
+                                   )
+    
 
     # define the model
     model = fcmae.__dict__[args.model](
@@ -172,7 +234,7 @@ def main(args):
     print("effective batch size: %d" % eff_batch_size)
 
     if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=args.find_unused_parameters)
         model_without_ddp = model.module
 
     param_groups = optim_factory.add_weight_decay(model_without_ddp, args.weight_decay)
@@ -187,7 +249,7 @@ def main(args):
     print(f"Start training for {args.epochs} epochs")
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
+        if args.distributed and not args.convert_to_ffcv:
             data_loader_train.sampler.set_epoch(epoch)
         if log_writer is not None:
             log_writer.set_step(epoch * num_training_steps_per_epoch * args.update_freq)

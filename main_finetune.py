@@ -31,6 +31,15 @@ from utils import NativeScalerWithGradNormCount as NativeScaler
 from utils import str2bool, remap_checkpoint_keys
 import models.convnextv2 as convnextv2
 
+from ffcv.writer import DatasetWriter
+from ffcv.fields import RGBImageField, IntField
+from ffcv.loader import Loader, OrderOption
+from ffcv.transforms import ToTensor, ToDevice, ToTorchImage
+from ffcv.fields.decoders import IntDecoder, RandomResizedCropRGBImageDecoder
+from ffcv.transforms.flip import RandomHorizontalFlip
+from ffcv.transforms.normalize import NormalizeImage
+from ffcv.transforms.random_resized_crop import RandomResizedCrop
+
 def get_args_parser():
     parser = argparse.ArgumentParser('FCMAE fine-tuning', add_help=False)
     parser.add_argument('--batch_size', default=64, type=int,
@@ -93,7 +102,7 @@ def get_args_parser():
     parser.add_argument('--smoothing', type=float, default=0.1,
                         help='Label smoothing (default: 0.1)')
     
-    parser.add_argument('--train_interpolation', type=str, default='bicubic',
+    parser.add_argument('--train_interpolation', type=str, default='BICUBIC',
                         help='Training interpolation (random, bilinear, bicubic default: "bicubic")')
 
     # * Random Erase params
@@ -147,9 +156,8 @@ def get_args_parser():
     parser.add_argument('--eval_data_path', default=None, type=str,
                         help='dataset path for evaluation')
     parser.add_argument('--imagenet_default_mean_and_std', type=str2bool, default=True)
-    parser.add_argument('--data_set', default='IMNET', choices=['CIFAR', 'IMNET', 'image_folder','TINY_IMAGENET','IMAGENET100','IMAGENET1K'],
+    parser.add_argument('--data_set', default='IMNET', choices=['CIFAR', 'IMNET', 'IMAGENET1K','IMAGENET100','TINY_IMAGENET','image_folder','COCO'],
                         type=str, help='ImageNet dataset path')
-    
     parser.add_argument('--auto_resume', type=str2bool, default=True)
     parser.add_argument('--save_ckpt', type=str2bool, default=True)
     parser.add_argument('--save_ckpt_freq', default=1, type=int)
@@ -166,7 +174,13 @@ def get_args_parser():
     parser.add_argument('--num_workers', default=10, type=int)
     parser.add_argument('--pin_mem', type=str2bool, default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
-
+    parser.add_argument('--convert_to_ffcv',type=str2bool, default=False,
+                        help='bool flag whether to use ffcv dataloader and convert current dataloader to ffcv')
+    parser.add_argument('--beton_path',type=str,default='/log_dir/imagenet.beton',
+                        help='Specify the path where to save the beton train/test data')
+    parser.add_argument('--validation_beton_path',type=str,default='/log_dir/imagenet_validation.beton',
+                        help='Specify the path where to save the validation beton data')
+    
     # Evaluation parameters
     parser.add_argument('--crop_pct', type=float, default=None)
 
@@ -177,6 +191,7 @@ def get_args_parser():
     parser.add_argument('--dist_on_itp', type=str2bool, default=False)
     parser.add_argument('--dist_url', default='env://',
                         help='url used to set up distributed training')
+    parser.add_argument('--find_unused_parameters', type=str2bool,default=False)
     
     parser.add_argument('--use_amp', type=str2bool, default=False, 
                         help="Use apex AMP (Automatic Mixed Precision) or not")
@@ -191,6 +206,7 @@ def main(args):
     seed = args.seed + utils.get_rank()
     torch.manual_seed(seed)
     np.random.seed(seed)
+
     cudnn.benchmark = True
 
     dataset_train, args.nb_classes = build_dataset(is_train=True, args=args)
@@ -202,10 +218,12 @@ def main(args):
 
     num_tasks = utils.get_world_size()
     global_rank = utils.get_rank()
+
     sampler_train = torch.utils.data.DistributedSampler(
         dataset_train, num_replicas=num_tasks, rank=global_rank, shuffle=True, seed=args.seed,
     )
     print("Sampler_train = %s" % str(sampler_train))
+
     if args.dist_eval:
         if len(dataset_val) % num_tasks != 0:
             print('Warning: Enabling distributed evaluation with an eval dataset not divisible by process number. '
@@ -222,21 +240,102 @@ def main(args):
     else:
         log_writer = None
 
-    data_loader_train = torch.utils.data.DataLoader(
-        dataset_train, sampler=sampler_train,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        pin_memory=args.pin_mem,
-        drop_last=True,
-    )
-    if dataset_val is not None:
-        data_loader_val = torch.utils.data.DataLoader(
-            dataset_val, sampler=sampler_val,
+    if args.convert_to_ffcv == False:
+        print("Creating standard dataloader.")
+        data_loader_train = torch.utils.data.DataLoader(
+            dataset_train, sampler=sampler_train,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
             pin_memory=args.pin_mem,
-            drop_last=False
+            drop_last=True,
         )
+    else:
+        print("Creating ffcv dataset")
+        writer = DatasetWriter(
+            Path(args.beton_path),
+            {
+                'image' : RGBImageField(write_mode='jpg', max_resolution=args.input_size),
+                'label' : IntField()
+            }
+        )
+        if not os.path.exists(Path(args.beton_path)):
+            print("Creating beton file")
+            writer.from_indexed_dataset(dataset_train)
+        else:
+            print(f"Beton file with the same name exists on path : {args.beton_path}, skipping conversion.")
+        image_decoder = RandomResizedCropRGBImageDecoder(output_size=(args.input_size, args.input_size), scale=(0.2, 1.0))
+        label_decoder = IntDecoder()
+
+        # Data decoding and augmentation
+        image_pipeline = [image_decoder, RandomHorizontalFlip(), NormalizeImage(mean=np.array([0.485, 0.456, 0.406]), std=np.array([0.229, 0.224, 0.225]),type=np.uint8),ToTensor(), ToTorchImage(), ToDevice(device)]
+        label_pipeline = [label_decoder, ToTensor(), ToDevice(device)]
+
+        # Pipeline for each data field
+        pipelines = {
+            'image': image_pipeline,
+            'label': label_pipeline
+        }
+
+        print("Creating ffcv dataloader")
+        # Replaces PyTorch data loader (`torch.utils.data.Dataloader`)
+        data_loader_train = Loader(fname=Path(args.beton_path), 
+                                   batch_size=args.batch_size, 
+                                   num_workers=args.num_workers,
+                                   order=OrderOption.RANDOM, 
+                                   pipelines=pipelines,
+                                   seed=seed, 
+                                   drop_last=True,
+                                   distributed=args.distributed
+                                   )
+    
+    if dataset_val is not None:
+        if args.convert_to_ffcv == False:
+            print("Creating standard validation dataloader.")
+            data_loader_val = torch.utils.data.DataLoader(
+                dataset_val, sampler=sampler_val,
+                batch_size=args.batch_size,
+                num_workers=args.num_workers,
+                pin_memory=args.pin_mem,
+                drop_last=False
+            )
+        else:
+            print("Creating validation ffcv dataset")
+            writer = DatasetWriter(
+                Path(args.validation_beton_path),
+                {
+                    'image' : RGBImageField(write_mode='jpg', max_resolution=args.input_size),
+                    'label' : IntField()
+                }
+            )
+            if not os.path.exists(Path(args.validation_beton_path)):
+                print("Creating validation beton file")
+                writer.from_indexed_dataset(dataset_val)
+            else:
+                print(f"Beton file with the same name exists on path : {args.validation_beton_path}, skipping conversion.")
+            image_decoder = RandomResizedCropRGBImageDecoder(output_size=(args.input_size, args.input_size), scale=(0.2, 1.0))
+            label_decoder = IntDecoder()
+
+            # Data decoding and augmentation
+            image_pipeline = [image_decoder, RandomHorizontalFlip(), NormalizeImage(mean=np.array([0.485, 0.456, 0.406]), std=np.array([0.229, 0.224, 0.225]),type=np.uint8),ToTensor(), ToTorchImage(), ToDevice(device)]
+            label_pipeline = [label_decoder, ToTensor(), ToDevice(device)]
+
+            # Pipeline for each data field
+            pipelines = {
+                'image': image_pipeline,
+                'label': label_pipeline
+            }
+
+            print("Creating validation ffcv dataloader")
+            # Replaces PyTorch data loader (`torch.utils.data.Dataloader`)
+            data_loader_val = Loader(fname=Path(args.validation_beton_path), 
+                                    batch_size=args.batch_size, 
+                                    num_workers=args.num_workers,
+                                    order=OrderOption.RANDOM, 
+                                    pipelines=pipelines,
+                                    seed=seed, 
+                                    drop_last=True,
+                                    distributed=args.distributed
+                                    )
     else:
         data_loader_val = None
 
@@ -354,7 +453,7 @@ def main(args):
     if args.eval:
         print(f"Eval only mode")
         test_stats = evaluate(data_loader_val, model, device)
-        print(f"Accuracy of the network on {len(dataset_val)} test images: {test_stats['acc1']:.5f}%")
+        print(f"Accuracy of the network on {len(dataset_val)} test images of {args.data_set} with {args.nb_classes} classes and input size : {args.input_size}: {test_stats['acc1']:.5f}%")
         return
     
     max_accuracy = 0.0
@@ -364,7 +463,7 @@ def main(args):
     print("Start training for %d epochs" % args.epochs)
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed:
+        if args.distributed and not args.convert_to_ffcv:
             data_loader_train.sampler.set_epoch(epoch)
         if log_writer is not None:
             log_writer.set_step(epoch * num_training_steps_per_epoch * args.update_freq)
