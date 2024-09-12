@@ -67,7 +67,7 @@ MODEL_PREFIX=''
 
 #dataset parameters
 DATA_PATH="/imagenet100"
-NB_CLASSES=200
+NB_CLASSES=100
 OUTPUT_DIR="/ConvNeXt-V2/log_dir/${RUN_NAME}_${MODEL_NAME}_${DATASET_NAME}_bs${BATCH_SIZE}_ep${EPOCHS}_inputsize${INPUT_SIZE}"
 LOG_DIR="/ConvNeXt-V2/log_dir/${RUN_NAME}_${MODEL_NAME}_${DATASET_NAME}_bs${BATCH_SIZE}_ep${EPOCHS}_inputsize${INPUT_SIZE}/tensorboard_log.txt"
 DEVICE="cuda"

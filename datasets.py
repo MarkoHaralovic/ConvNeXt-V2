@@ -102,7 +102,7 @@ def build_transform(is_train, args):
         else:
             if args.crop_pct is None:
                 args.crop_pct = 224 / 256
-            if args.crop_pct == 1.0:
+            if args.crop_pct != 1.0:
                 size = int(args.input_size / args.crop_pct)
                 t.append(
                     # to maintain same ratio w.r.t. 224 images
