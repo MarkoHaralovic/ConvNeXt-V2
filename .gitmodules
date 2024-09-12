@@ -1,3 +1,5 @@
 [submodule "MinkowskiEngine"]
 	path = MinkowskiEngine
-	url = git@github.com:shwoo93/MinkowskiEngine.git
+	active = true 
+	url = https://github.com/shwoo93/MinkowskiEngine.git
+	branch=main
