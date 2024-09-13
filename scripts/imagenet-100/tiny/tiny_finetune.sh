@@ -14,7 +14,6 @@ UPDATE_FREQ=1
 #model parameters
 MODEL="convnextv2_tiny"
 INPUT_SIZE=224
-MASK_RATIO=0.6
 DROP_PATH=0.0
 LAYER_DECAY_TYPE='single' 
 
@@ -43,7 +42,7 @@ MOMENTUM=0.9
 # COLOR_JITTER=''
 AA='rand-m9-mstd0.5-inc1'
 SMOOTHING=0.1
-TRAIN_INTERPOLATION='bicubic'
+TRAIN_INTERPOLATION='BICUBIC'
 
 # * Random Erase params
 REPROB=0.25
@@ -109,7 +108,7 @@ cp "$0" "$OUTPUT_DIR/config.txt"
 
 python -m torch.distributed.launch --nproc_per_node="$NUM_GPU" "$PYTHON_SCRIPT" \
  --batch_size "$BATCH_SIZE"  --epochs  "$EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
- --model "$MODEL"  --input_size "$INPUT_SIZE"  --mask_ratio "$MASK_RATIO"  --drop_path "$DROP_PATH"  --layer_decay_type "$LAYER_DECAY_TYPE"  \
+ --model "$MODEL"  --input_size "$INPUT_SIZE"  --drop_path "$DROP_PATH"  --layer_decay_type "$LAYER_DECAY_TYPE"  \
  --model_ema "$MODEL_EMA" --model_ema_decay "$MODEL_EMA_DECAY" --model_ema_force_cpu "$MODEL_EMA_FORCE_CPU" --model_ema_eval "$MODEL_EMA_EVAL" \
  --weight_decay "$WEIGHT_DECAY"  --lr "$LR"  --blr "$BLR"  --layer_decay "$LAYER_DECAY" --min_lr "$MIN_LR" --warmup_epochs "$WARMUP_EPOCHS"  \
  --warmup_steps "$WARMUP_STEPS"  --opt "$OPT"  --opt_eps "$OPT_EPS"  --momentum "$MOMENTUM"\

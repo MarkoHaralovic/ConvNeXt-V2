@@ -7,6 +7,7 @@
 
 
 import os
+import torchvision
 from torchvision import datasets, transforms
 
 from timm.data.constants import \
@@ -34,7 +35,6 @@ def build_dataset(is_train, args):
             dataset = datasets.CIFAR100(args.data_path, train=is_train, download=True)
         nb_classes = 100
     elif args.data_set == 'IMNET':
-        print("Reading from datapath", args.data_path)
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         if not args.convert_to_ffcv :
             dataset = datasets.ImageFolder(root, transform=transform)
@@ -42,7 +42,6 @@ def build_dataset(is_train, args):
             dataset = datasets.ImageFolder(root)
         nb_classes = 1000
     elif args.data_set == 'IMAGENET1K':
-        print("Reading from datapath", args.data_path)
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         if not args.convert_to_ffcv :
             dataset = datasets.ImageFolder(root, transform=transform)
@@ -51,7 +50,6 @@ def build_dataset(is_train, args):
         nb_classes = 1000
         assert args.nb_classes == nb_classes
     elif args.data_set == 'IMAGENET100':
-        print("Reading from datapath", args.data_path)
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         if not args.convert_to_ffcv :
             dataset = datasets.ImageFolder(root, transform=transform)
@@ -60,7 +58,6 @@ def build_dataset(is_train, args):
         nb_classes = 100
         assert args.nb_classes == nb_classes
     elif args.data_set == 'TINY_IMAGENET':
-        print("Reading from datapath", args.data_path)
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         if not args.convert_to_ffcv :
             dataset = datasets.ImageFolder(root, transform=transform)
@@ -69,7 +66,6 @@ def build_dataset(is_train, args):
         nb_classes = 200
         assert args.nb_classes == nb_classes
     elif args.data_set == "image_folder":
-        print("Reading from datapath", args.data_path)
         root = args.data_path if is_train else args.eval_data_path
         if not args.convert_to_ffcv:
             dataset = datasets.ImageFolder(root, transform=transform)
@@ -81,7 +77,8 @@ def build_dataset(is_train, args):
         raise NotImplementedError()
     
     print(f"Dataset type : {args.data_path}")
-    print("Number of the class = %d" % nb_classes)
+    print("Reading from datapath", args.data_path)
+    print("Number of classes =  %d" % nb_classes)
 
     return dataset, nb_classes
 
@@ -117,7 +114,7 @@ def build_transform(is_train, args):
         if args.input_size >= 384:  
             t.append(
             transforms.Resize((args.input_size, args.input_size), 
-                            interpolation=transforms.InterpolationMode.BICUBIC), 
+                            interpolation=torchvision.transforms.InterpolationMode.BICUBIC), 
         )
             print(f"Warping {args.input_size} size input images...")
         else:
@@ -129,7 +126,7 @@ def build_transform(is_train, args):
                 size = int(args.input_size / args.crop_pct)
                 t.append(
                     # to maintain same ratio w.r.t. 224 images
-                    transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC),  
+                    transforms.Resize(size, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),  
                 )
             t.append(transforms.CenterCrop(args.input_size))
 

@@ -34,8 +34,15 @@ def train_one_epoch(model: torch.nn.Module,
 
         if not isinstance(samples, list):
             samples = samples.to(device, non_blocking=True)
+        if torch.cuda.is_available() and device == torch.device('cuda'):
+            if not samples.is_cuda:
+                samples = samples.to(device, non_blocking=True)
+            if not samples.is_cuda:
+                labels = labels.to(device, non_blocking=True)
+        
         labels = labels.to(device, non_blocking=True)
-
+        samples = samples.float()
+        
         loss, _, _ = model(samples, labels, mask_ratio=args.mask_ratio)
 
         loss_value = loss.item()
