@@ -1,0 +1,4 @@
+timm==0.3.2
+tensorboardX
+six
+submitit

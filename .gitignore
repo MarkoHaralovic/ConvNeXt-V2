@@ -2,7 +2,6 @@
 **/__pycache__/**
 .idea/*
 ckpt/
-*.pth
 *.log
-*.txt
 /pretrained_weights
+/log_dir
