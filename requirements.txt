@@ -2,3 +2,10 @@ timm==0.3.2
 tensorboardX
 six
 submitit
+numpy==1.22
+torch==1.8.0
+torchvision==0.9.0
+torchaudio==0.8.0 
+cupy-cuda113 
+numba
+ffcv
