@@ -44,6 +44,7 @@ def get_args_parser():
     parser.add_argument('--batch_size', default=64, type=int,
                         help='Per GPU batch size')
     parser.add_argument('--epochs', default=800, type=int)
+    parser.add_argument('--patch_size', default=32, type=int)
     parser.add_argument('--warmup_epochs', type=int, default=40, metavar='N',
                         help='epochs to warmup LR')
     parser.add_argument('--update_freq', default=1, type=int,
@@ -211,7 +212,8 @@ def main(args):
         mask_ratio=args.mask_ratio,
         decoder_depth=args.decoder_depth,
         decoder_embed_dim=args.decoder_embed_dim,
-        norm_pix_loss=args.norm_pix_loss
+        norm_pix_loss=args.norm_pix_loss,
+        patch_size=args.patch_size
     )
     model.to(device)
 

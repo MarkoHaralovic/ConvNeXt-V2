@@ -8,6 +8,7 @@ NUM_GPU=1
 
 # ConvNeXt parameters
 BATCH_SIZE=128
+PATCH_SIZE=32
 EPOCHS=800
 WARMUP_EPOCHS=40
 UPDATE_FREQ=1
@@ -59,7 +60,7 @@ touch "$OUTPUT_DIR/config.txt"
 cp "$0" "$OUTPUT_DIR/config.txt"
 
 python -m torch.distributed.launch --nproc_per_node="$NUM_GPU" "$PYTHON_SCRIPT" \
- --batch_size "$BATCH_SIZE"  --epochs  "$EPOCHS" --warmup_epochs "$WARMUP_EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
+ --batch_size "$BATCH_SIZE" --patch_size "$PATCH_SIZE"  --epochs  "$EPOCHS" --warmup_epochs "$WARMUP_EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
  --model "$MODEL"  --input_size "$INPUT_SIZE"  --mask_ratio "$MASK_RATIO"  --decoder_depth  "$DECODER_DEPTH" --decoder_embed_dim "$DECODER_EMBED_DIM" \
  --weight_decay "$WEIGHT_DECAY" --blr "$BLR"  --min_lr "$MIN_LR"  \
  --data_path "$DATA_PATH"  --output_dir "$OUTPUT_DIR"  --log_dir "$LOG_DIR"  --device "$DEVICE"  --seed "$SEED"  --resume "$RESUME"  \

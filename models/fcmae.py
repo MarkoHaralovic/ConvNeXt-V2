@@ -35,6 +35,8 @@ class FCMAE(nn.Module):
                 norm_pix_loss=False):
         super().__init__()
 
+        assert (img_size % patch_size == 0), "Patch size must fit image size."
+
         # configs
         self.img_size = img_size
         self.depths = depths
@@ -45,25 +47,30 @@ class FCMAE(nn.Module):
         self.decoder_embed_dim = decoder_embed_dim
         self.decoder_depth = decoder_depth
         self.norm_pix_loss = norm_pix_loss
+        self.in_chans = in_chans
 
         # encoder
         self.encoder = SparseConvNeXtV2(
-            in_chans=in_chans, depths=depths, dims=dims, D=2)
+            patch_size=self.patch_size,
+            in_chans=self.in_chans, 
+            depths=self.depths, 
+            dims=self.imds, 
+            D=2)
         # decoder
         self.proj = nn.Conv2d(
-            in_channels=dims[-1], 
-            out_channels=decoder_embed_dim, 
+            in_channels=self.imds[-1], #could be changed and be model specific
+            out_channels=self.decoder_embed_dim, 
             kernel_size=1)
         # mask tokens
-        self.mask_token = nn.Parameter(torch.zeros(1, decoder_embed_dim, 1, 1))
+        self.mask_token = nn.Parameter(torch.zeros(1, self.decoder_embed_dim, 1, 1))
         decoder = [Block(
-            dim=decoder_embed_dim, 
-            drop_path=0.) for i in range(decoder_depth)]
+            dim=self.decoder_embed_dim, 
+            drop_path=0.) for i in range(self.decoder_depth)]
         self.decoder = nn.Sequential(*decoder)
         # pred
         self.pred = nn.Conv2d(
-            in_channels=decoder_embed_dim,
-            out_channels=patch_size ** 2 * in_chans,
+            in_channels=self.decoder_embed_dim,
+            out_channels=self.patch_size ** 2 * self.in_chans,
             kernel_size=1)
 
         self.apply(self._init_weights)
@@ -97,9 +104,9 @@ class FCMAE(nn.Module):
         assert imgs.shape[2] == imgs.shape[3] and imgs.shape[2] % p == 0
 
         h = w = imgs.shape[2] // p
-        x = imgs.reshape(shape=(imgs.shape[0], 3, h, p, w, p))
+        x = imgs.reshape(shape=(imgs.shape[0], imgs.shape[1], h, p, w, p))
         x = torch.einsum('nchpwq->nhwpqc', x)
-        x = x.reshape(shape=(imgs.shape[0], h * w, p**2 * 3))
+        x = x.reshape(shape=(imgs.shape[0], h * w, p**2 * imgs.shape[1]))
         return x
 
     def unpatchify(self, x):
@@ -111,9 +118,9 @@ class FCMAE(nn.Module):
         h = w = int(x.shape[1]**.5)
         assert h * w == x.shape[1]
         
-        x = x.reshape(shape=(x.shape[0], h, w, p, p, 3))
+        x = x.reshape(shape=(x.shape[0], h, w, p, p, self.channels))
         x = torch.einsum('nhwpqc->nchpwq', x)
-        imgs = x.reshape(shape=(x.shape[0], 3, h * p, h * p))
+        imgs = x.reshape(shape=(x.shape[0], self.channels, h * p, h * p))
         return imgs
 
     def gen_random_mask(self, x, mask_ratio):
@@ -160,6 +167,7 @@ class FCMAE(nn.Module):
         # pred
         pred = self.pred(x)
         return pred
+
 
     def forward_loss(self, imgs, pred, mask):
         """

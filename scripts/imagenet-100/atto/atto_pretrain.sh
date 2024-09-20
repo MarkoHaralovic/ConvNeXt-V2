@@ -8,6 +8,7 @@ NUM_GPU=1
 
 # ConvNeXt parameters
 BATCH_SIZE=128
+PATCH_SIZE=32
 EPOCHS=800
 WARMUP_EPOCHS=40 
 UPDATE_FREQ=1
@@ -27,7 +28,7 @@ MIN_LR=0.
 
 #dataset parameters
 DATA_PATH="/imagenet100"
-OUTPUT_DIR="/ConvNeXt-V2/log_dir/${RUN_NAME}_${MODEL_NAME}_${DATASET_NAME}_bs${BATCH_SIZE}_ep${EPOCHS}_inputsize${INPUT_SIZE}"
+OUTPUT_DIR="/ConvNeXt-V2/log_dir/${RUN_NAME}_${MODEL_NAME}_${DATASET_NAME}_bs${BATCH_SIZE}_ps${PATCH_SIZE}_ep${EPOCHS}_inputsize${INPUT_SIZE}"
 LOG_DIR="/ConvNeXt-V2/log_dir/${RUN_NAME}_${MODEL_NAME}_${DATASET_NAME}_bs${BATCH_SIZE}_ep${EPOCHS}_inputsize${INPUT_SIZE}/tensorboard_log.txt"
 DEVICE="cuda"
 SEED=0
@@ -41,7 +42,7 @@ SAVE_CKPT_NUM=3
 START_EPOCH=0
 NUM_WORKERS=4
 PIN_MEM=False
-CONVERT_TO_FFCV=True 
+CONVERT_TO_FFCV=False 
 BETON_PATH="/imagenet100/imagenet100.beton"
 VALIDATION_BETON_PATH="/imagenet100/imagenet100_validation.beton"
 
@@ -60,7 +61,7 @@ touch "$OUTPUT_DIR/config.txt"
 cp "$0" "$OUTPUT_DIR/config.txt"
 
 python -m torch.distributed.launch --nproc_per_node="$NUM_GPU" "$PYTHON_SCRIPT" \
- --batch_size "$BATCH_SIZE"  --epochs  "$EPOCHS" --warmup_epochs "$WARMUP_EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
+ --batch_size "$BATCH_SIZE" --patch_size "$PATCH_SIZE" --epochs  "$EPOCHS" --warmup_epochs "$WARMUP_EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
  --model "$MODEL"  --input_size "$INPUT_SIZE"  --mask_ratio "$MASK_RATIO"  --decoder_depth  "$DECODER_DEPTH" --decoder_embed_dim "$DECODER_EMBED_DIM" \
  --weight_decay "$WEIGHT_DECAY" --blr "$BLR"  --min_lr "$MIN_LR"  \
  --data_path "$DATA_PATH"  --output_dir "$OUTPUT_DIR"  --log_dir "$LOG_DIR"  --device "$DEVICE"  --seed "$SEED"  --resume "$RESUME"  \

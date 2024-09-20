@@ -7,8 +7,9 @@ DATASET_NAME="tiny_imagenet"
 NUM_GPU=1
 
 # ConvNeXt parameters
-BATCH_SIZE=8 #1024
-EPOCHS=1 #800
+BATCH_SIZE=1024
+EPOCHS=800
+PATCH_SIZE=8
 WARMUP_EPOCHS=40 
 UPDATE_FREQ=1
 
@@ -41,7 +42,7 @@ SAVE_CKPT_NUM=3
 START_EPOCH=0
 NUM_WORKERS=4
 PIN_MEM=False
-CONVERT_TO_FFCV=True 
+CONVERT_TO_FFCV=False #True 
 BETON_PATH="/tiny_imagenet/tiny_imagenet.beton"
 
 # distributed training parameters
@@ -59,7 +60,7 @@ touch "$OUTPUT_DIR/config.txt"
 cp "$0" "$OUTPUT_DIR/config.txt"
 
 python -m torch.distributed.launch --nproc_per_node="$NUM_GPU" "$PYTHON_SCRIPT" \
- --batch_size "$BATCH_SIZE"  --epochs  "$EPOCHS" --warmup_epochs "$WARMUP_EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
+ --batch_size "$BATCH_SIZE" --patch_size "$PATCH_SIZE" --epochs  "$EPOCHS" --warmup_epochs "$WARMUP_EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
  --model "$MODEL"  --input_size "$INPUT_SIZE" \
  --data_path "$DATA_PATH"  --output_dir "$OUTPUT_DIR"  --log_dir "$LOG_DIR"  --device "$DEVICE"  --seed "$SEED"  --resume "$RESUME"  \
  --auto_resume "$AUTO_RESUME"  --save_ckpt "$SAVE_CKPT" --save_ckpt_freq "$SAVE_CKPT_FREQ" --save_ckpt_num "$SAVE_CKPT_NUM" \
