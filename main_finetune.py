@@ -267,7 +267,7 @@ def main(args):
         label_decoder = IntDecoder()
 
         # Data decoding and augmentation
-        image_pipeline = [image_decoder, RandomHorizontalFlip(), NormalizeImage(mean=np.array([0.485, 0.456, 0.406]), std=np.array([0.229, 0.224, 0.225]),type=np.uint8),ToTensor(), ToTorchImage(), ToDevice(device)]
+        image_pipeline = [image_decoder, RandomHorizontalFlip(), NormalizeImage(mean=np.array([0.485, 0.456, 0.406]), std=np.array([0.229, 0.224, 0.225]),type=np.uint16),ToTensor(), ToTorchImage(), ToDevice(device)]
         label_pipeline = [label_decoder, ToTensor(), ToDevice(device)]
 
         # Pipeline for each data field

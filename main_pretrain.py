@@ -209,6 +209,7 @@ def main(args):
 
     # define the model
     model = fcmae.__dict__[args.model](
+        img_size=args.input_size, 
         mask_ratio=args.mask_ratio,
         decoder_depth=args.decoder_depth,
         decoder_embed_dim=args.decoder_embed_dim,
