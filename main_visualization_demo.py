@@ -132,7 +132,6 @@ def show_one_image(model, image, image_mean,image_std,output_path):
     plt.imshow(im_mean_in)
     plt.axis('off')
 
-    
     plt.savefig(output_path)
     plt.show()
 
@@ -184,7 +183,6 @@ def main(args):
         loss_scaler=loss_scaler
     )   
     fcmae_model = fcmae_model.to(device)
-    fcmae_model.train(True)
 
     i = 0 
     try :
