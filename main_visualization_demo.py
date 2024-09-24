@@ -24,6 +24,7 @@ import models.fcmae as fcmae
 import utils
 from utils import NativeScalerWithGradNormCount as NativeScaler
 from utils import str2bool
+from datasets import build_dataset
 
 def get_args_parser():
     parser = argparse.ArgumentParser('FCMAE fine-tuning', add_help=False)
@@ -49,29 +50,54 @@ def get_args_parser():
     parser.add_argument('--lr', type=float, default=0.0004, metavar='LR',
                         help='learning rate (absolute lr)')
 
+    # Augmentation parameters
+    parser.add_argument('--color_jitter', type=float, default=None, metavar='PCT',
+                       help='Color jitter factor (enabled only when not using Auto/RandAug)')
+    parser.add_argument('--aa', type=str, default='rand-m9-mstd0.5-inc1', metavar='NAME',
+                        help='Use AutoAugment policy. "v0" or "original". " + "(default: rand-m9-mstd0.5-inc1)')
+    parser.add_argument('--smoothing', type=float, default=0.1,
+                        help='Label smoothing (default: 0.1)')
+    
+    parser.add_argument('--train_interpolation', type=str, default='BICUBIC',
+                        help='Training interpolation (random, bilinear, bicubic default: "bicubic")')
+
+    # * Random Erase params
+    parser.add_argument('--reprob', type=float, default=0.00, metavar='PCT',
+                        help='Random erase prob (default: 0.00)')
+    parser.add_argument('--remode', type=str, default='pixel',
+                        help='Random erase mode (default: "pixel")')
+    parser.add_argument('--recount', type=int, default=1,
+                        help='Random erase count (default: 1)')
+    parser.add_argument('--resplit', type=str2bool, default=False,
+                        help='Do not random erase first (clean) augmentation split')
+    
     # Dataset parameters
-    parser.add_argument('--data_path', default='/tiny_imagenet/train', type=str,
+    parser.add_argument('--data_path', default='/imagenet100', type=str,
                         help='dataset path')
-    parser.add_argument('--nb_classes', default=200, type=int,
+    parser.add_argument('--data_set', default='IMAGENET100', choices=['CIFAR', 'IMNET', 'IMAGENET1K','IMAGENET100','TINY_IMAGENET','image_folder','COCO'],
+                        type=str, help='ImageNet dataset path')
+    parser.add_argument('--nb_classes', default=100, type=int,
                         help='number of the classification types')
-    parser.add_argument('--output_dir', default='visualization/pretrain_atto_imagenet100_bs32_ep300_inputsize64',
+    parser.add_argument('--output_dir', default='visualization/pretrain_atto_tiny_imagenet_bs1024_ep1600_inputsize64',
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
-    parser.add_argument('--resume', default='log_dir/pretrain_atto_imagenet100_bs32_ep300_inputsize64/checkpoint-195.pth',
+    parser.add_argument('--resume', default='log_dir/pretrain_atto_tiny_imagenet_bs1024_ep1600_inputsize64/checkpoint-1599.pth',
                         help='resume from checkpoint')
-    
+    parser.add_argument('--convert_to_ffcv',type=str2bool, default=False,
+                        help='bool flag whether to use ffcv dataloader and convert current dataloader to ffcv')
     parser.add_argument('--auto_resume', type=str2bool, default=True)
-
-    parser.add_argument('--num_workers', default=8, type=int)
+    parser.add_argument('--imagenet_default_mean_and_std', type=str2bool, default=True)
+    parser.add_argument('--num_workers', default=4, type=int)
     parser.add_argument('--pin_mem', type=str2bool, default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
 
     # Evaluation parameters
-    parser.add_argument('--patch_size', type=int, default=8)
+    parser.add_argument('--patch_size', type=int, default=32)
+    parser.add_argument('--crop_pct', type=float, default=None)
 
     # Visualization parameters
-    parser.add_argument('--images_to_visualize', type=float, default=10)
+    parser.add_argument('--images_to_visualize', type=float, default=20)
 
     return parser
 
@@ -149,13 +175,15 @@ def main(args):
 
     transform = transforms.Compose([
         transforms.Resize((args.input_size,args.input_size)),
+        transforms.RandomHorizontalFlip(p=0.5), 
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    dataset_train = datasets.ImageFolder(os.path.join(args.data_path), transform=transform)
+    dataset, _ = build_dataset(is_train=True,args=args,transform=transform)
+    
     data_loader_train = torch.utils.data.DataLoader(
-        dataset_train, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=args.pin_mem, drop_last=True
+        dataset, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=args.pin_mem, drop_last=True
     )
     dataiter = iter(data_loader_train)
 
@@ -187,7 +215,6 @@ def main(args):
     i = 0 
     try :
         while i<args.images_to_visualize:
-            print(fcmae_model.mask_ratio)
             image_file_name = f'visual_reconstruction{i}.png'
             img, _ = next(dataiter)
             img = img.to(device, non_blocking=True)

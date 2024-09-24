@@ -16,6 +16,8 @@ from pathlib import Path
 
 import torch
 import torch.backends.cudnn as cudnn
+import torchvision.transforms as transforms
+import torchvision
 
 from timm.models.layers import trunc_normal_
 from timm.data.mixup import Mixup
@@ -209,7 +211,14 @@ def main(args):
 
     cudnn.benchmark = True
 
-    dataset_train, args.nb_classes = build_dataset(is_train=True, args=args)
+    transform = transforms.Compose([
+        transforms.Resize((args.input_size,args.input_size),interpolation=torchvision.transforms.InterpolationMode.BICUBIC),
+        transforms.RandomHorizontalFlip(p=0.5), 
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+    dataset_train, args.nb_classes = build_dataset(is_train=True, args=args,transform=transform)
     if args.disable_eval:
         args.dist_eval = False
         dataset_val = None

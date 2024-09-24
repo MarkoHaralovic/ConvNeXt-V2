@@ -14,10 +14,9 @@ from timm.data.constants import \
     IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD, IMAGENET_INCEPTION_MEAN, IMAGENET_INCEPTION_STD
 from timm.data import create_transform
 
-def build_dataset(is_train, args):
-    if not args.convert_to_ffcv :
+def build_dataset(is_train, args, transform=None):
+    if not args.convert_to_ffcv and transform is None:
         transform = build_transform(is_train, args)
-
         print("Transform = ")
         if isinstance(transform, tuple):
             for trans in transform:
@@ -28,6 +27,7 @@ def build_dataset(is_train, args):
             for t in transform.transforms:
                 print(t)
         print("---------------------------")
+
     if args.data_set == 'CIFAR':
         if not args.convert_to_ffcv :
             dataset = datasets.CIFAR100(args.data_path, train=is_train, transform=transform, download=True)
@@ -90,7 +90,6 @@ def build_transform(is_train, args):
     std = IMAGENET_INCEPTION_STD if not imagenet_default_mean_and_std else IMAGENET_DEFAULT_STD
 
     if is_train:
-        # this should always dispatch to transforms_imagenet_train
         transform = create_transform(
             input_size=args.input_size,
             is_training=True,
@@ -120,16 +119,15 @@ def build_transform(is_train, args):
         else:
             if args.crop_pct is None and args.input_size==224: 
                 args.crop_pct = 224 / 256
-            else:
+            elif args.crop_pct is None:
                 args.crop_pct = 1.0
-            if args.crop_pct != 1.0:
-                size = int(args.input_size / args.crop_pct)
-                t.append(
-                    # to maintain same ratio w.r.t. 224 images
-                    transforms.Resize(size, interpolation=torchvision.transforms.InterpolationMode.BICUBIC),  
-                )
+            size = int(args.input_size / args.crop_pct)
+            t.append(
+                transforms.Resize((size,size), interpolation=torchvision.transforms.InterpolationMode.BICUBIC),  
+            )
             t.append(transforms.CenterCrop(args.input_size))
 
     t.append(transforms.ToTensor())
     t.append(transforms.Normalize(mean, std))
+    print(t)
     return transforms.Compose(t)
