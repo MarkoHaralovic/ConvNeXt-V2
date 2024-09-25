@@ -7,8 +7,8 @@ DATASET_NAME="tiny_imagenet"
 NUM_GPU=1
 
 # ConvNeXt parameters
-BATCH_SIZE=1024
-EPOCHS=600
+BATCH_SIZE=32
+EPOCHS=1
 UPDATE_FREQ=1
 
 #model parameters

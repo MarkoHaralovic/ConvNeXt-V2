@@ -76,7 +76,7 @@ def build_dataset(is_train, args, transform=None):
     else:
         raise NotImplementedError()
     
-    print(f"Dataset type : {args.data_path}")
+    print(f"Dataset type : {args.data_set}")
     print("Reading from datapath", args.data_path)
     print("Number of classes =  %d" % nb_classes)
 

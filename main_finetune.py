@@ -53,7 +53,7 @@ def get_args_parser():
     # Model parameters
     parser.add_argument('--model', default='convnextv2_base', type=str, metavar='MODEL',
                         help='Name of model to train')
-    parser.add_argument('--input_size', default=224, type=int,
+    parser.add_argument('--input_size', default=64, type=int,
                         help='image input size')
     parser.add_argument('--drop_path', type=float, default=0., metavar='PCT',
                         help='Drop path rate (default: 0.1)')
@@ -169,7 +169,7 @@ def get_args_parser():
                         help='start epoch')
     parser.add_argument('--eval', type=str2bool, default=False,
                         help='Perform evaluation only')
-    parser.add_argument('--dist_eval', type=str2bool, default=True,
+    parser.add_argument('--dist_eval', type=str2bool, default=False,
                         help='Enabling distributed evaluation')
     parser.add_argument('--disable_eval', type=str2bool, default=False,
                         help='Disabling evaluation during training')
