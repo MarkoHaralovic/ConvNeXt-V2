@@ -2,18 +2,18 @@
 
 #environment variables
 RUN_NAME="finetune"
-MODEL_NAME="tiny"
+MODEL_NAME="pretrain_tiny_tiny_imagenet_bs1024_ep1600_inputsize64"
 DATASET_NAME="imagenet100"
 NUM_GPU=1
 
 # ConvNeXt parameters
-BATCH_SIZE=128
+BATCH_SIZE=256
 EPOCHS=300
 UPDATE_FREQ=1
 
 #model parameters
 MODEL="convnextv2_tiny"
-INPUT_SIZE=224
+INPUT_SIZE=64
 DROP_PATH=0.0
 LAYER_DECAY_TYPE='single' 
 
@@ -59,7 +59,7 @@ MIXUP_SWITCH_PROB=0.5
 MIXUP_MODE='batch'
 
 # * Finetuning params
-FINETUNE=''
+FINETUNE='ConvNeXt-V2/log_dir/pretrain_tiny_tiny_imagenet_bs1024_ep1600_inputsize64/checkpoint-1599.pth'
 HEAD_INIT_SCALE=0.001
 MODEL_KEY='model|module'
 MODEL_PREFIX=''
@@ -75,7 +75,7 @@ RESUME=''
 
 EVAL_DATA_PATH=''
 IMAGENET_DEFAULT_MEAN_AND_STD=True
-DATA_SET='IMNET'
+DATA_SET='IMAGENET100'
 AUTO_RESUME=True
 SAVE_CKPT=True
 SAVE_CKPT_FREQ=1
@@ -110,7 +110,7 @@ python -m torch.distributed.launch --nproc_per_node="$NUM_GPU" "$PYTHON_SCRIPT" 
  --batch_size "$BATCH_SIZE"  --epochs  "$EPOCHS"  --update_freq  "$UPDATE_FREQ"  \
  --model "$MODEL"  --input_size "$INPUT_SIZE"  --drop_path "$DROP_PATH"  --layer_decay_type "$LAYER_DECAY_TYPE"  \
  --model_ema "$MODEL_EMA" --model_ema_decay "$MODEL_EMA_DECAY" --model_ema_force_cpu "$MODEL_EMA_FORCE_CPU" --model_ema_eval "$MODEL_EMA_EVAL" \
- --weight_decay "$WEIGHT_DECAY"  --lr "$LR"  --blr "$BLR"  --layer_decay "$LAYER_DECAY" --min_lr "$MIN_LR" --warmup_epochs "$WARMUP_EPOCHS"  \
+ --weight_decay "$WEIGHT_DECAY" --blr "$BLR"  --layer_decay "$LAYER_DECAY" --min_lr "$MIN_LR" --warmup_epochs "$WARMUP_EPOCHS"  \
  --warmup_steps "$WARMUP_STEPS"  --opt "$OPT"  --opt_eps "$OPT_EPS"  --momentum "$MOMENTUM"\
  --aa "$AA"  --smoothing "$SMOOTHING"  --train_interpolation "$TRAIN_INTERPOLATION"\
  --reprob "$REPROB"  --remode "$REMODE"  --recount "$RECOUNT" --resplit "$RESPLIT"\

@@ -2,18 +2,18 @@
 
 #environment variables
 RUN_NAME="finetune"
-MODEL_NAME="atto"
+MODEL_NAME="pretrain_atto_tiny_imagenet_bs1024_ep1600_inputsize64"
 DATASET_NAME="imagenet100"
 NUM_GPU=1
 
 # ConvNeXt parameters
-BATCH_SIZE=128
+BATCH_SIZE=1024
 EPOCHS=600
 UPDATE_FREQ=1
 
 #model parameters
 MODEL="convnextv2_atto"
-INPUT_SIZE=224
+INPUT_SIZE=64
 DROP_PATH=0.0
 LAYER_DECAY_TYPE='single' 
 
@@ -71,7 +71,7 @@ OUTPUT_DIR="/ConvNeXt-V2/log_dir/${RUN_NAME}_${MODEL_NAME}_${DATASET_NAME}_bs${B
 LOG_DIR="/ConvNeXt-V2/log_dir/${RUN_NAME}_${MODEL_NAME}_${DATASET_NAME}_bs${BATCH_SIZE}_ep${EPOCHS}_inputsize${INPUT_SIZE}/tensorboard_log.txt"
 DEVICE="cuda"
 SEED=0
-RESUME=''
+RESUME='ConvNeXt-V2/log_dir/finetune_pretrain_atto_tiny_imagenet_bs1024_ep1600_inputsize64_imagenet100_bs1024_ep600_inputsize64/checkpoint-191.pth'
 
 EVAL_DATA_PATH=''
 IMAGENET_DEFAULT_MEAN_AND_STD=True
@@ -81,9 +81,9 @@ SAVE_CKPT=True
 SAVE_CKPT_FREQ=1
 SAVE_CKPT_NUM=3
 
-START_EPOCH=0
+START_EPOCH=192
 EVAL=False
-DIST_EVAL=True
+DIST_EVAL=False
 DISABLE_EVAL=False
 NUM_WORKERS=4
 PIN_MEM=False
